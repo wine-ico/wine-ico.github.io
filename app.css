@@ -1,0 +1,35 @@
+body, html {
+  height: 100%;
+  user-select: none;
+  font-family: 'Montserrat', sans-serif;
+  white-space: nowrap;
+}
+.heading {
+  font-size: 1.5em;
+}
+#logo {
+  width: 130px;
+  height: 130px;
+}
+.num {
+  font-family: 'Fira Code', monospace;
+  margin: 0 0.3em;
+}
+#progress_div {
+  height: 28px;
+  width: 70%;
+}
+.b {
+  font-weight: bold;
+}
+#info_div {
+  width: 70%;
+}
+@media (max-width: 992px) {
+  #info_div {
+    width: 100%;
+  }
+  #progress_div {
+    width: 100%;
+  }
+}
