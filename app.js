@@ -187,7 +187,7 @@ $(document).on('click', '#buy', function () {
   window.hive_keychain.requestCustomJson(
     current_user,
     'ssc-mainnet-hive',
-    'posting',
+    'active',
     JSON.stringify(obj),
     `Buy Staked WINE from ICO ${phase}`,
     function (result) {
