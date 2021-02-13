@@ -10,7 +10,7 @@ function n(x) {
   return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
 }
 
-$(window).bind('load', async function () {
+async function load () {
   let ico_status = await axios.get('https://wine-ico.herokuapp.com/ico_status');
   if (ico_status.data.purchased) total_purchased = ico_status.data.purchased;
 
@@ -23,6 +23,8 @@ $(window).bind('load', async function () {
   $('#p-bar').attr('style', `width: ${percent_filled}%;`);
   $('#phase').text(phase);
 
+  $('#ranges').html('');
+  $('#prices').html('');
   if (BigNumber(total_purchased).eq(0)) current_price_range = prices[0];
   for (let i = 0; i < prices.length; i += 1) {
     const range = prices[i];
@@ -40,12 +42,15 @@ $(window).bind('load', async function () {
     );
   }
 
-  $('#loading').remove();
+  $('#loading').addClass('d-none');
+  $('#loading').removeClass('d-flex');
   $('#body').addClass('d-flex');
   $('#body').removeClass('d-none');
-});
+}
 
-$(document).on('click', '#load', async function () {
+$(window).bind('load', load);
+
+async function load_user () {
   const username = $('#username').val();
   current_user = null;
 
@@ -74,9 +79,13 @@ $(document).on('click', '#load', async function () {
   $('#user_purchased').text(`| ${user_purchased} WINE`);
   $('#user_remaining').text(`| ${user_remaining} WINE`);
   $('#user_balance').text(`| ${user_balance} SWAP.HIVE`);
-  $('#quantity_hive').removeAttr('disabled');
-  $('#quantity_wine').removeAttr('disabled');
-});
+  if (!BigNumber(total_purchased).gte(limit)) {
+    $('#quantity_hive').removeAttr('disabled');
+    $('#quantity_wine').removeAttr('disabled');
+  }
+}
+
+$(document).on('click', '#load', load_user);
 
 function calculateWine () {
   $('#buy').attr('disabled', '');
@@ -103,20 +112,23 @@ function calculateWine () {
 
     // now from the leftover quantity calculate with the next price range
     const nextPriceRange = prices[current_price_range.id + 1];
-    toBuyInNextRange = BigNumber(quantityOverPriceRange)
-      .dividedBy(nextPriceRange.price)
-      .toFixed(8);
+    if (nextPriceRange) {
+      toBuyInNextRange = BigNumber(quantityOverPriceRange)
+        .dividedBy(nextPriceRange.price)
+        .toFixed(8);
 
-    // total number of tokens to buy
-    tokens = BigNumber(remainingInThisPriceRange)
-      .plus(toBuyInNextRange)
-      .toFixed(8)
-      .toString();
+      // total number of tokens to buy
+      tokens = BigNumber(remainingInThisPriceRange)
+        .plus(toBuyInNextRange)
+        .toFixed(8)
+        .toString();
+    }
   }
 
   $('#quantity_wine').val(parseFloat(tokens));
   if (BigNumber(user_remaining).gte(tokens)
-    && BigNumber(user_balance).gte(hive)) {
+    && BigNumber(user_balance).gte(hive)
+    && BigNumber(tokens).gt(0.00000001)) {
     $('#buy').removeAttr('disabled');
   }
 }
@@ -144,20 +156,23 @@ function calculateHive () {
       .toFixed(8);
 
     const nextPriceRange = prices[current_price_range.id + 1];
-    const tokensOverPriceRange = BigNumber(wine)
-      .minus(remainingInThisPriceRange)
-      .toFixed(8);
-    const priceForNextRange = BigNumber(tokensOverPriceRange)
-      .multipliedBy(nextPriceRange.price)
-      .toFixed(8);
-    
-    price = BigNumber(priceForRemainingTokens)
-      .plus(priceForNextRange);
+    if (nextPriceRange) {
+      const tokensOverPriceRange = BigNumber(wine)
+        .minus(remainingInThisPriceRange)
+        .toFixed(8);
+      const priceForNextRange = BigNumber(tokensOverPriceRange)
+        .multipliedBy(nextPriceRange.price)
+        .toFixed(8);
+      
+      price = BigNumber(priceForRemainingTokens)
+        .plus(priceForNextRange);
+    }
   }
 
   $('#quantity_hive').val(parseFloat(price));
   if (BigNumber(user_remaining).gte(wine)
-    && BigNumber(user_balance).gte(price)) {
+    && BigNumber(user_balance).gte(price)
+    && BigNumber(price).gt(0.00000001)) {
     $('#buy').removeAttr('disabled');
   }
 }
@@ -165,9 +180,39 @@ function calculateHive () {
 $(document).on('change', '#quantity_wine', calculateHive);
 $(document).on('keyup', '#quantity_wine', calculateHive);
 
-$(document).on('click', '#buy', function () {
+$(document).on('click', '#buy', async function () {
+  $('#loading').addClass('d-flex');
+  $('#loading').removeClass('d-none');
+  $('#body').addClass('d-none');
+  $('#body').removeClass('d-flex');
+  let previous_total_purchased = total_purchased;
+  await load();
+
+  const wine = $('#quantity_wine').val();
+  const purchased_after_this = BigNumber(total_purchased).plus(wine);
+  if (BigNumber(purchased_after_this).gt(limit)) {
+    alert('Quantity exceeds ICO limit');
+    return;
+  }
+
+  if (BigNumber(total_purchased).gte(limit)) {
+    $('#buy').attr('disabled', '');
+    $('#quantity_hive').attr('disabled', '');
+    $('#quantity_wine').attr('disabled', '');
+    alert('ICO has been completed.');
+    return;
+  }
+
+  await load_user();
+
+  if (previous_total_purchased !== total_purchased) {
+    calculateWine();
+    alert('ICO status has been updated, Press Buy again');
+    return;
+  }
+
   const amount = $('#quantity_hive').val();
-  
+
   if (!window.hive_keychain) {
     alert('Please Install Hive Keychain');
     return;
@@ -190,12 +235,24 @@ $(document).on('click', '#buy', function () {
     'active',
     JSON.stringify(obj),
     `Buy Staked WINE from ICO ${phase}`,
-    function (result) {
-      if (result.success) {
+    async function (response) {
+      if (response.success) {
         alert(`Successfully Bought Staked WINE from ICO ${phase}`);
-        location.reload();
+        $('#loading').addClass('d-flex');
+        $('#loading').removeClass('d-none');
+        $('#body').addClass('d-none');
+        $('#body').removeClass('d-flex');
+
+        let result = null;
+        do {
+          result = await ssc.getTransactionInfo(response.result.id);
+        } while (result === null);
+
+        setTimeout(function () {
+          location.reload();
+        }, 3000);
       } else {
-        alert('An Error Occured. Please Try Again.');
+        alert('An Error Occured, Please Try Again');
       }
     }
   );
