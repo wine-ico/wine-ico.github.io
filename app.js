@@ -11,7 +11,7 @@ function n(x) {
 }
 
 async function load () {
-  let ico_status = await axios.get('https://wine-ico.herokuapp.com/ico_status');
+  let ico_status = await axios.get('https://wine-token.herokuapp.com/ico/ico_status');
   if (ico_status.data.purchased) total_purchased = ico_status.data.purchased;
 
   $('#limit').text(n(limit));
@@ -71,7 +71,7 @@ async function load_user () {
   current_user = username;
   user_balance = account.balance;
 
-  let user_status = await axios.get(`https://wine-ico.herokuapp.com/${username}`);
+  let user_status = await axios.get(`https://wine-token.herokuapp.com/ico/${username}`);
   if (user_status.data.purchased) user_purchased = user_status.data.purchased;
 
   user_remaining = BigNumber(limit_per_user).minus(user_purchased);
