@@ -1,4 +1,4 @@
-const ico_account = 'imagenius.fund';
+const ico_account = 'wine-ico';
 const limit = '100000';
 const limit_per_user = '5000';
 const phase = 'Phase #1';
