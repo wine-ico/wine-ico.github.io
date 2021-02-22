@@ -16,7 +16,7 @@ async function load () {
 
   $('#limit').text(n(limit));
   $('#user_limit').text(`| ${limit_per_user} WINE`);
-  $('#total_purchased').text(n(total_purchased));
+  $('#total_purchased').text(n(BigNumber(total_purchased).toFixed(0)));
   const percent_filled = BigNumber(total_purchased)
     .multipliedBy(100)
     .dividedBy(limit);
